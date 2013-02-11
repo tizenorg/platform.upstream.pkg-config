@@ -1,13 +1,12 @@
 Name:           pkg-config
-Version:        0.27.1
+Version:        0.28
 Release:        0
 Summary:        A library management system
 License:        GPL-2.0+
-Group:          System/Packages
+Group:          Platfrom Development/Tools
 Url:            http://pkgconfig.freedesktop.org/
 Source:         http://pkgconfig.freedesktop.org/releases/%{name}-%{version}.tar.gz
 Provides:       pkgconfig = %{version}
-Obsoletes:      pkgconfig < 0.21
 # pkg-config has a virtual internal pkg-config.pc file, so we should provide it
 Provides:       pkgconfig(pkg-config) = %{version}
 
@@ -31,13 +30,13 @@ make %{?_smp_mflags}
 
 %install
 %make_install
-# We'll put it with the other docs
 rm %{buildroot}%{_datadir}/doc/pkg-config/pkg-config-guide.html
 
 %files
 %defattr(-,root,root)
-%doc COPYING
+%license COPYING
 %{_bindir}/pkg-config
+%{_bindir}/x86_64-tizen-linux-gnu-pkg-config
 %dir %{_datadir}/aclocal
 %{_datadir}/aclocal/pkg.m4
 
