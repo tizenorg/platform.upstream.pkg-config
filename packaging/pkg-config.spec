@@ -36,7 +36,7 @@ rm %{buildroot}%{_datadir}/doc/pkg-config/pkg-config-guide.html
 %defattr(-,root,root)
 %license COPYING
 %{_bindir}/pkg-config
-%{_bindir}/x86_64-tizen-linux-gnu-pkg-config
+%{_bindir}/*-pkg-config
 %dir %{_datadir}/aclocal
 %{_datadir}/aclocal/pkg.m4
 
