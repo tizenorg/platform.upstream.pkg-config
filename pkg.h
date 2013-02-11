@@ -22,6 +22,18 @@
 
 #include <glib.h>
 
+typedef guint8 FlagType; /* bit mask for flag types */
+
+#define LIBS_l       (1 << 0)
+#define LIBS_L       (1 << 1)
+#define LIBS_OTHER   (1 << 2)
+#define CFLAGS_I     (1 << 3)
+#define CFLAGS_OTHER (1 << 4)
+
+#define LIBS_ANY     (LIBS_l | LIBS_L | LIBS_OTHER)
+#define CFLAGS_ANY   (CFLAGS_I | CFLAGS_OTHER)
+#define FLAGS_ANY    (LIBS_ANY | CFLAGS_ANY)
+
 typedef enum
 {
   LESS_THAN,
@@ -33,8 +45,15 @@ typedef enum
   ALWAYS_MATCH
 } ComparisonType;
 
+typedef struct _Flag Flag;
 typedef struct _Package Package;
 typedef struct _RequiredVersion RequiredVersion;
+
+struct _Flag
+{
+  FlagType type;
+  char *arg;
+};
 
 struct _RequiredVersion
 {
@@ -52,46 +71,30 @@ struct _Package
   char *description;
   char *url;
   char *pcfiledir; /* directory it was loaded from */
-  GSList *requires;
-  GSList *requires_private;
-  GSList *l_libs;
-  char   *l_libs_merged;
-  GSList *L_libs;
-  char   *L_libs_merged;
-  GSList *other_libs;
-  char   *other_libs_merged;
-  GSList *I_cflags;
-  char   *I_cflags_merged;
-  GSList *other_cflags;
-  char *other_cflags_merged;
+  GList *requires_entries;
+  GList *requires;
+  GList *requires_private_entries;
+  GList *requires_private;
+  GList *libs;
+  GList *cflags;
   GHashTable *vars;
   GHashTable *required_versions; /* hash from name to RequiredVersion */
-  GSList *conflicts; /* list of RequiredVersion */
+  GList *conflicts; /* list of RequiredVersion */
   gboolean uninstalled; /* used the -uninstalled file */
   int path_position; /* used to order packages by position in path of their .pc file, lower number means earlier in path */
   int libs_num; /* Number of times the "Libs" header has been seen */
   int libs_private_num;  /* Number of times the "Libs.private" header has been seen */
+  gboolean in_requires_chain; /* package is in current Requires chain */
 };
 
 Package *get_package               (const char *name);
 Package *get_package_quiet         (const char *name);
-char *   package_get_l_libs        (Package    *pkg);
-char *   packages_get_l_libs       (GSList     *pkgs);
-char *   package_get_L_libs        (Package    *pkg);
-char *   packages_get_L_libs       (GSList     *pkgs);
-char *   package_get_other_libs    (Package    *pkg);
-char *   packages_get_other_libs   (GSList     *pkgs);
-char *   packages_get_all_libs     (GSList     *pkgs);
-char *   package_get_I_cflags      (Package    *pkg);
-char *   packages_get_I_cflags     (GSList     *pkgs);
-char *   package_get_other_cflags  (Package    *pkg);
-char *   packages_get_other_cflags (GSList     *pkgs);
-char *   packages_get_all_cflags   (GSList     *pkgs);
+char *   packages_get_flags        (GList      *pkgs,
+                                    FlagType   flags);
 char *   package_get_var           (Package    *pkg,
                                     const char *var);
-char *   packages_get_var          (GSList     *pkgs,
+char *   packages_get_var          (GList      *pkgs,
                                     const char *var);
-
 
 void add_search_dir (const char *path);
 void add_search_dirs (const char *path, const char *separator);
@@ -133,13 +136,12 @@ extern char *pkg_config_pc_path;
 #ifdef G_OS_WIN32
 /* If TRUE, do not automatically define "prefix"  while
  * parsing each .pc file */
-extern int dont_define_prefix;
+extern gboolean dont_define_prefix;
 /* The name of the variable that acts as prefix, unless it is "prefix" */
 extern char *prefix_variable;
 
 /* If TRUE, output flags in MSVC syntax. */
-extern int msvc_syntax;
+extern gboolean msvc_syntax;
 #endif
 
 #endif
-

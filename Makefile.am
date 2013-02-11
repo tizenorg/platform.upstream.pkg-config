@@ -24,6 +24,7 @@ endif
 
 AM_CFLAGS = \
 	$(WARN_CFLAGS) \
+	$(GCOV_CFLAGS) \
 	$(GLIB_CFLAGS)
 
 bin_PROGRAMS = pkg-config
@@ -35,12 +36,26 @@ pkg_config_SOURCES= \
 	parse.c \
 	main.c
 
+if HOST_TOOL
+host_tool = $(host)-pkg-config$(EXEEXT)
+install-exec-hook:
+	cd $(DESTDIR)$(bindir) && $(LN) pkg-config$(EXEEXT) $(host_tool)
+uninstall-hook:
+	cd $(DESTDIR)$(bindir) && rm -f $(host_tool)
+endif
+
 # Various data files
 m4dir = $(datadir)/aclocal
 dist_m4_DATA = pkg.m4
 dist_doc_DATA = pkg-config-guide.html
 dist_man_MANS = pkg-config.1
 EXTRA_DIST = README.win32
+
+# gcov test coverage
+gcov:
+	-$(MAKE) $(AM_MAKEFLAGS) -k check
+	$(GCOV) $(pkg_config_SOURCES)
+CLEANFILES = *.gcda *.gcno *.gcov
 
 # Since we can't always have glib in DIST_SUBDIRS, we need to make sure
 # glib is configured when we want to run dist. Unfortunately, there's no

@@ -35,9 +35,9 @@
 #include <sys/types.h>
 
 #ifdef G_OS_WIN32
-int dont_define_prefix = FALSE;
+gboolean dont_define_prefix = FALSE;
 char *prefix_variable = "prefix";
-int msvc_syntax = FALSE;
+gboolean msvc_syntax = FALSE;
 #endif
 
 #ifdef G_OS_WIN32
@@ -290,10 +290,10 @@ typedef enum
 
 #define PARSE_SPEW 0
 
-static GSList*
+static GList *
 split_module_list (const char *str, const char *path)
 {
-  GSList *retval = NULL;
+  GList *retval = NULL;
   const char *p;
   const char *start;
   ModuleSplitState state = OUTSIDE_MODULE;
@@ -374,7 +374,7 @@ split_module_list (const char *str, const char *path)
         {
           /* We left a module */
           char *module = g_strndup (start, p - start);
-          retval = g_slist_prepend (retval, module);
+          retval = g_list_prepend (retval, module);
 
 #if PARSE_SPEW
           fprintf (stderr, "found module: '%s'\n", module);
@@ -392,7 +392,7 @@ split_module_list (const char *str, const char *path)
     {
       /* get the last module */
       char *module = g_strndup (start, p - start);
-      retval = g_slist_prepend (retval, module);
+      retval = g_list_prepend (retval, module);
 
 #if PARSE_SPEW
       fprintf (stderr, "found module: '%s'\n", module);
@@ -400,17 +400,17 @@ split_module_list (const char *str, const char *path)
       
     }
   
-  retval = g_slist_reverse (retval);
+  retval = g_list_reverse (retval);
 
   return retval;
 }
 
-GSList*
+GList *
 parse_module_list (Package *pkg, const char *str, const char *path)
 {
-  GSList *split;
-  GSList *iter;
-  GSList *retval = NULL;
+  GList *split;
+  GList *iter;
+  GList *retval = NULL;
 
   split = split_module_list (str, path);
   
@@ -426,7 +426,7 @@ parse_module_list (Package *pkg, const char *str, const char *path)
       ver = g_new0 (RequiredVersion, 1);
       ver->comparison = ALWAYS_MATCH;
       ver->owner = pkg;
-      retval = g_slist_prepend (retval, ver);
+      retval = g_list_prepend (retval, ver);
       
       while (*p && MODULE_SEPARATOR (*p))
         ++p;
@@ -509,13 +509,13 @@ parse_module_list (Package *pkg, const char *str, const char *path)
 
       g_assert (ver->name);
       
-      iter = g_slist_next (iter);
+      iter = g_list_next (iter);
     }
 
-  g_slist_foreach (split, (GFunc) g_free, NULL);
-  g_slist_free (split);
+  g_list_foreach (split, (GFunc) g_free, NULL);
+  g_list_free (split);
 
-  retval = g_slist_reverse (retval);
+  retval = g_list_reverse (retval);
 
   return retval;
 }
@@ -523,10 +523,8 @@ parse_module_list (Package *pkg, const char *str, const char *path)
 static void
 parse_requires (Package *pkg, const char *str, const char *path)
 {
-  GSList *parsed;
-  GSList *iter;
   char *trimmed;
-  
+
   if (pkg->requires)
     {
       verbose_error ("Requires field occurs twice in '%s'\n", path);
@@ -535,45 +533,15 @@ parse_requires (Package *pkg, const char *str, const char *path)
     }
 
   trimmed = trim_and_sub (pkg, str, path);
-  parsed = parse_module_list (pkg, trimmed, path);
+  pkg->requires_entries = parse_module_list (pkg, trimmed, path);
   g_free (trimmed);
-  
-  iter = parsed;
-  while (iter != NULL)
-    {
-      Package *req;
-      RequiredVersion *ver = iter->data;
-      
-      req = get_package (ver->name);
-
-      if (req == NULL)
-        {
-          verbose_error ("Package '%s', required by '%s', not found\n",
-                         ver->name, pkg->name ? pkg->name : path);
-          
-          exit (1);
-        }
-
-      if (pkg->required_versions == NULL)
-        pkg->required_versions = g_hash_table_new (g_str_hash, g_str_equal);
-      
-      g_hash_table_insert (pkg->required_versions, ver->name, ver);
-      
-      pkg->requires = g_slist_prepend (pkg->requires, req);
-
-      iter = g_slist_next (iter);
-    }
-
-  g_slist_free (parsed);
 }
 
 static void
 parse_requires_private (Package *pkg, const char *str, const char *path)
 {
-  GSList *parsed;
-  GSList *iter;
   char *trimmed;
-  
+
   if (pkg->requires_private)
     {
       verbose_error ("Requires.private field occurs twice in '%s'\n", path);
@@ -582,36 +550,8 @@ parse_requires_private (Package *pkg, const char *str, const char *path)
     }
 
   trimmed = trim_and_sub (pkg, str, path);
-  parsed = parse_module_list (pkg, trimmed, path);
+  pkg->requires_private_entries = parse_module_list (pkg, trimmed, path);
   g_free (trimmed);
-  
-  iter = parsed;
-  while (iter != NULL)
-    {
-      Package *req;
-      RequiredVersion *ver = iter->data;
-      
-      req = get_package (ver->name);
-
-      if (req == NULL)
-        {
-          verbose_error ("Package '%s', required by '%s', not found\n",
-                         ver->name, pkg->name ? pkg->name : path);
-          
-          exit (1);
-        }
-
-      if (pkg->required_versions == NULL)
-        pkg->required_versions = g_hash_table_new (g_str_hash, g_str_equal);
-      
-      g_hash_table_insert (pkg->required_versions, ver->name, ver);
-      
-      pkg->requires_private = g_slist_prepend (pkg->requires_private, req);
-
-      iter = g_slist_next (iter);
-    }
-
-  g_slist_free (parsed);
 }
 
 static void
@@ -643,7 +583,8 @@ static char *strdup_escape_shell(const char *s)
 		    (s[0] > '=' && s[0] < '@') ||
 		    (s[0] > 'Z' && s[0] < '^') ||
 		    (s[0] == '`') ||
-		    (s[0] > 'z')) {
+		    (s[0] > 'z' && s[0] < '~') ||
+		    (s[0] > '~')) {
 			r[c] = '\\';
 			c++;
 		}
@@ -675,6 +616,7 @@ static void _do_parse_libs (Package *pkg, int argc, char **argv)
   i = 0;
   while (i < argc)
     {
+      Flag *flag = g_new (Flag, 1);
       char *tmp = trim_string (argv[i]);
       char *arg = strdup_escape_shell(tmp);
       char *p;
@@ -691,9 +633,9 @@ static void _do_parse_libs (Package *pkg, int argc, char **argv)
           while (*p && isspace ((guchar)*p))
             ++p;
 
-          pkg->l_libs = g_slist_prepend (pkg->l_libs,
-                                         g_strconcat (l_flag, p, lib_suffix, NULL));
-
+          flag->type = LIBS_l;
+          flag->arg = g_strconcat (l_flag, p, lib_suffix, NULL);
+          pkg->libs = g_list_prepend (pkg->libs, flag);
         }
       else if (p[0] == '-' &&
                p[1] == 'L')
@@ -701,8 +643,10 @@ static void _do_parse_libs (Package *pkg, int argc, char **argv)
           p += 2;
           while (*p && isspace ((guchar)*p))
             ++p;
-	  pkg->L_libs = g_slist_prepend (pkg->L_libs,
-					 g_strconcat (L_flag, p, NULL));
+
+          flag->type = LIBS_L;
+          flag->arg = g_strconcat (L_flag, p, lib_suffix, NULL);
+          pkg->libs = g_list_prepend (pkg->libs, flag);
 	}
       else if (strcmp("-framework",p) == 0 && i+1 < argc)
         {
@@ -713,19 +657,23 @@ static void _do_parse_libs (Package *pkg, int argc, char **argv)
           */
           gchar *framework, *tmp = trim_string (argv[i+1]);
 
-	  framework = strdup_escape_shell(tmp);
-          pkg->other_libs = g_slist_prepend (pkg->other_libs,
-                                             g_strconcat(arg, " ", framework, NULL));
+          framework = strdup_escape_shell(tmp);
+          flag->type = LIBS_OTHER;
+          flag->arg = g_strconcat (arg, " ", framework, NULL);
+          pkg->libs = g_list_prepend (pkg->libs, flag);
           i++;
-          g_free(framework);
-          g_free(tmp);
+          g_free (framework);
+          g_free (tmp);
+        }
+      else if (*arg != '\0')
+        {
+          flag->type = LIBS_OTHER;
+          flag->arg = g_strdup (arg);
+          pkg->libs = g_list_prepend (pkg->libs, flag);
         }
       else
-        {
-          if (*arg != '\0')
-            pkg->other_libs = g_slist_prepend (pkg->other_libs,
-                                               g_strdup (arg));
-        }
+        /* flag wasn't used */
+        g_free (flag);
 
       g_free (arg);
 
@@ -825,7 +773,7 @@ parse_cflags (Package *pkg, const char *str, const char *path)
   GError *error = NULL;
   int i;
   
-  if (pkg->I_cflags || pkg->other_cflags)
+  if (pkg->cflags)
     {
       verbose_error ("Cflags field occurs twice in '%s'\n", path);
 
@@ -845,6 +793,7 @@ parse_cflags (Package *pkg, const char *str, const char *path)
   i = 0;
   while (i < argc)
     {
+      Flag *flag = g_new (Flag, 1);
       char *tmp = trim_string (argv[i]);
       char *arg = strdup_escape_shell(tmp);
       char *p = arg;
@@ -857,22 +806,32 @@ parse_cflags (Package *pkg, const char *str, const char *path)
           while (*p && isspace ((guchar)*p))
             ++p;
 
-          pkg->I_cflags = g_slist_prepend (pkg->I_cflags,
-                                           g_strconcat ("-I", p, NULL));
+          flag->type = CFLAGS_I;
+          flag->arg = g_strconcat ("-I", p, NULL);
+          pkg->cflags = g_list_prepend (pkg->cflags, flag);
+        }
+      else if (strcmp("-idirafter", arg) == 0 && i+1 < argc)
+        {
+          char *dirafter, *tmp;
 
-        } else {
-          if (*arg != '\0')
-            pkg->other_cflags = g_slist_prepend (pkg->other_cflags,
-                                                 g_strdup (arg));
-	  if (strcmp("-idirafter", arg) == 0) {
-	      char *n;
-
-	      tmp = trim_string(argv[++i]);
-	      n = strdup_escape_shell(tmp);
-	      pkg->other_cflags = g_slist_prepend(pkg->other_cflags, n);
-	      g_free(tmp);
-	  }
-      }
+          tmp = trim_string (argv[i+1]);
+          dirafter = strdup_escape_shell (tmp);
+          flag->type = CFLAGS_OTHER;
+          flag->arg = g_strconcat (arg, " ", dirafter, NULL);
+          pkg->cflags = g_list_prepend (pkg->cflags, flag);
+          i++;
+          g_free (dirafter);
+          g_free (tmp);
+        }
+      else if (*arg != '\0')
+        {
+          flag->type = CFLAGS_OTHER;
+          flag->arg = g_strdup (arg);
+          pkg->cflags = g_list_prepend (pkg->cflags, flag);
+        }
+      else
+        /* flag wasn't used */
+        g_free (flag);
 
       g_free (arg);
       
@@ -1152,20 +1111,8 @@ parse_package_file (const char *path, gboolean ignore_requires,
   g_string_free (str, TRUE);
   fclose(f);
 
-  /* make ->requires_private include a copy of the public requires too */
-  pkg->requires_private = g_slist_concat(g_slist_copy (pkg->requires),
-					 pkg->requires_private);
-  
-  pkg->requires = g_slist_reverse (pkg->requires);
-  
-  pkg->requires_private = g_slist_reverse (pkg->requires_private);
-
-  pkg->I_cflags = g_slist_reverse (pkg->I_cflags);
-  pkg->other_cflags = g_slist_reverse (pkg->other_cflags);
-
-  pkg->l_libs = g_slist_reverse (pkg->l_libs);
-  pkg->L_libs = g_slist_reverse (pkg->L_libs);
-  pkg->other_libs = g_slist_reverse (pkg->other_libs);
+  pkg->cflags = g_list_reverse (pkg->cflags);
+  pkg->libs = g_list_reverse (pkg->libs);
   
   return pkg;
 }

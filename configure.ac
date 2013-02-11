@@ -1,6 +1,6 @@
 AC_PREREQ([2.62])
 AC_INIT([pkg-config],
-        [0.27.1],
+        [0.28],
         [https://bugs.freedesktop.org/enter_bug.cgi?product=pkg-config],
         [pkg-config])
 
@@ -19,6 +19,7 @@ m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 
 dnl Check for programs
 AC_PROG_CC
+AC_CHECK_PROG([LN], [ln], [ln], [cp -Rp])
 
 dnl Check for headers
 AC_CHECK_HEADERS([dirent.h unistd.h sys/wait.h malloc.h])
@@ -72,12 +73,13 @@ AC_ARG_WITH([system_library_path],
     [avoid -L flags from the given path])],
   [system_library_path="$withval"],
   [
-case "$libdir" in
-*lib64)
-  system_library_path="/usr/lib64:/usr/lib"
+pc_lib_sfx=`echo "$libdir" | sed 's:.*/lib::'`
+case "$pc_lib_sfx" in
+*/*|"")
+  system_library_path="/usr/lib:/lib"
   ;;
 *)
-  system_library_path="/usr/lib"
+  system_library_path="/usr/lib$pc_lib_sfx:/lib$pc_lib_sfx:/usr/lib:/lib"
   ;;
 esac
 ])
@@ -122,7 +124,7 @@ or auto])
 esac
 AC_MSG_RESULT($use_indirect_deps)
 AC_DEFINE_UNQUOTED([ENABLE_INDIRECT_DEPS],
-    [`test $use_indirect_deps = no; echo $?`],
+    [`test $use_indirect_deps = yes && echo TRUE || echo FALSE`],
     [Link library to all dependent libraries, not only directly needed ones])
 AC_SUBST([use_indirect_deps])
 
@@ -151,7 +153,10 @@ dnl
 dnl Find glib or use internal copy. Required version is 2.16 for
 dnl g_win32_get_package_installation_directory_of_module().
 dnl
-m4_define([glib_module], ["glib-2.0 >= 2.16"])
+dnl Pull in pkg-config macros to find external glib.
+dnl
+m4_include([pkg.m4])
+m4_define([glib_module], [glib-2.0 >= 2.16])
 AC_ARG_WITH([internal-glib],
   [AS_HELP_STRING([--with-internal-glib], [use internal glib])],
   [with_internal_glib="$withval"],
@@ -166,21 +171,47 @@ if test "x$with_internal_glib" = xyes; then
   AC_CONFIG_SUBDIRS([glib])
 else
   AC_MSG_RESULT([no])
-  if test "x$GLIB_CFLAGS" = "x" && test "x$GLIB_LIBS" = "x"; then
-    AC_CHECK_PROGS([PKG_CONFIG], [pkg-config], [])
-    if test -n $PKG_CONFIG && $PKG_CONFIG --exists glib_module; then
-      GLIB_CFLAGS=`$PKG_CONFIG --cflags glib_module`
-      GLIB_LIBS=`$PKG_CONFIG --libs glib_module`
-    else
-      AC_MSG_ERROR(m4_normalize([pkg-config and ]glib_module[ not found,
-                                 please set GLIB_CFLAGS and GLIB_LIBS to
-                                 the correct values or pass
-                                 --with-internal-glib to configure]))
-    fi
-  fi
+  PKG_CHECK_MODULES([GLIB], glib_module, [], [AC_MSG_ERROR([]dnl
+[m4_normalize([Either a previously installed pkg-config or "]glib_module["
+              could not be found. Please set GLIB_CFLAGS and GLIB_LIBS to
+              the correct values or pass --with-internal-glib to configure
+              to use the bundled copy.])])])
 fi
 AC_SUBST(GLIB_LIBS)
 AC_SUBST(GLIB_CFLAGS)
+
+dnl
+dnl Optional gcov test coverage usage
+dnl
+AC_ARG_WITH([gcov],
+  [AS_HELP_STRING([--with-gcov], [gcov test coverage @<:@default=no@:>@])],
+  [],
+  [with_gcov=no])
+if test "x$with_gcov" = xyes; then
+  if test "$GCC" = no; then
+    AC_MSG_ERROR([gcov test coverage can only be used with GCC])
+  fi
+
+  AC_PATH_PROG([GCOV], [gcov], [AC_MSG_ERROR([could not find gcov program])])
+  GCOV_CFLAGS="-fprofile-arcs -ftest-coverage"
+
+  # Ensure there's no optimizing since last -O wins and CFLAGS is used
+  # at the end of COMPILE/LTCOMPILE.
+  CFLAGS="${CFLAGS+$CFLAGS }-O0"
+fi
+AC_SUBST([GCOV_CFLAGS])
+
+dnl See if the user wants a host- prefixed tool
+dnl (e.g. i686-pc-linux-gnu-pkg-config) to be installed.
+dnl
+AC_MSG_CHECKING([if host- prefixed tool should be installed])
+AC_ARG_ENABLE([host-tool],
+  [AS_HELP_STRING([--disable-host-tool],
+    [install link to pkg-config with $host- prefix @<:@default=yes@:>@])],
+  [],
+  [enable_host_tool=yes])
+AC_MSG_RESULT([$enable_host_tool])
+AM_CONDITIONAL([HOST_TOOL], [test "x$enable_host_tool" = xyes])
 
 AC_CONFIG_FILES([
 Makefile
