@@ -3,7 +3,7 @@ Version:        0.28
 Release:        0
 Summary:        A library management system
 License:        GPL-2.0+
-Group:          Platfrom Development/Tools
+Group:          Base/Tools
 Url:            http://pkgconfig.freedesktop.org/
 Source:         http://pkgconfig.freedesktop.org/releases/%{name}-%{version}.tar.gz
 Provides:       pkgconfig = %{version}
