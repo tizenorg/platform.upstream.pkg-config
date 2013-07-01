@@ -6,6 +6,7 @@ License:        GPL-2.0+
 Group:          Base/Tools
 Url:            http://pkgconfig.freedesktop.org/
 Source:         http://pkgconfig.freedesktop.org/releases/%{name}-%{version}.tar.gz
+Source1001: 	pkg-config.manifest
 Provides:       pkgconfig = %{version}
 # pkg-config has a virtual internal pkg-config.pc file, so we should provide it
 Provides:       pkgconfig(pkg-config) = %{version}
@@ -17,6 +18,7 @@ against one or more libraries.
 
 %prep
 %setup -q
+cp %{SOURCE1001} .
 
 %build
 %configure\
@@ -33,6 +35,7 @@ make %{?_smp_mflags}
 rm %{buildroot}%{_datadir}/doc/pkg-config/pkg-config-guide.html
 
 %files
+%manifest %{name}.manifest
 %defattr(-,root,root)
 %license COPYING
 %{_bindir}/pkg-config
