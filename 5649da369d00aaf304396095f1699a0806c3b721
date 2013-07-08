@@ -1,0 +1,8 @@
+Change-Id: I5649da369d00aaf304396095f1699a0806c3b721
+Code-Review+2: Ryan Ware <ware@linux.intel.com>
+Verified+1: Ryan Ware <ware@linux.intel.com>
+Submitted-by: Ryan Ware <ware@linux.intel.com>
+Submitted-at: Mon, 08 Jul 2013 09:36:49 -0700
+Reviewed-on: https://review.tizen.org/gerrit/5274
+Project: platform/upstream/pkg-config
+Branch: refs/heads/tizen
