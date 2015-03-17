@@ -34,6 +34,14 @@ make %{?_smp_mflags}
 %make_install
 rm %{buildroot}%{_datadir}/doc/pkg-config/pkg-config-guide.html
 
+# Sometimes one file is installed twice with different names.
+# Here they are replaced with a symbolic link to pkg-config.
+for equal_file in `ls %{buildroot}%{_bindir}/*-pkg-config`
+do
+	rm ${equal_file}
+	ln -s %{_bindir}/pkg-config ${equal_file}
+done
+
 %files
 %manifest %{name}.manifest
 %defattr(-,root,root)
