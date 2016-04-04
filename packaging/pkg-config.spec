@@ -21,6 +21,9 @@ against one or more libraries.
 cp %{SOURCE1001} .
 
 %build
+export CFLAGS+=" -fvisibility=hidden"
+  export CXXFLAGS+=" -fvisibility=hidden"
+  
 %configure\
     --with-internal-glib \
 %if "%{_lib}" == "lib"
